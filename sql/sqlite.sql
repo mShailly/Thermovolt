@@ -1,0 +1,18 @@
+CREATE TABLE IF NOT EXISTS experiments(id TEXT PRIMARY KEY,name TEXT NOT NULL,inputs TEXT NOT NULL,results TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS maintenance(id TEXT PRIMARY KEY,experiment_id TEXT NOT NULL REFERENCES experiments(id) ON DELETE RESTRICT,title TEXT NOT NULL,notes TEXT NOT NULL DEFAULT '',status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','reviewed','closed')),created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_experiments_created ON experiments(created_at);
+CREATE INDEX IF NOT EXISTS idx_maintenance_experiment ON maintenance(experiment_id);
+CREATE VIEW IF NOT EXISTS experiment_followups AS SELECT e.id,e.name,COUNT(m.id) AS action_count FROM experiments e LEFT JOIN maintenance m ON e.id=m.experiment_id GROUP BY e.id,e.name;
+
+CREATE TABLE IF NOT EXISTS telemetry_readings(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,run_id TEXT NOT NULL,source TEXT NOT NULL,observed_at TEXT NOT NULL,temperature REAL NOT NULL,soc REAL NOT NULL,voltage REAL NOT NULL,current REAL NOT NULL,flow REAL,payload TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_telemetry_session_time ON telemetry_readings(session_id,observed_at);
+CREATE TABLE IF NOT EXISTS thermal_alerts(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,run_id TEXT NOT NULL,code TEXT NOT NULL,severity TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,action TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','acknowledged','resolved')),created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(session_id,run_id,code));
+CREATE INDEX IF NOT EXISTS idx_alert_session_time ON thermal_alerts(session_id,created_at);
+CREATE TABLE IF NOT EXISTS vehicle_connections(session_id TEXT PRIMARY KEY,token_hash TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS fleet_users(vehicle_id TEXT PRIMARY KEY,pin_salt TEXT NOT NULL,pin_hash TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS fleet_sessions(id TEXT PRIMARY KEY,vehicle_id TEXT NOT NULL REFERENCES fleet_users(vehicle_id),expires_at REAL NOT NULL,created_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_fleet_sessions_vehicle ON fleet_sessions(vehicle_id);
+CREATE TABLE IF NOT EXISTS fleet_readings(id TEXT PRIMARY KEY,vehicle_id TEXT NOT NULL,observed_at TEXT NOT NULL,temperature REAL NOT NULL,speed REAL NOT NULL,drive_mode TEXT NOT NULL,payload TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_fleet_readings_vehicle_time ON fleet_readings(vehicle_id,observed_at);
+CREATE TABLE IF NOT EXISTS fleet_alerts(id TEXT PRIMARY KEY,vehicle_id TEXT NOT NULL,code TEXT NOT NULL,severity TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,action TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','acknowledged','resolved')),created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(vehicle_id,code));
+CREATE INDEX IF NOT EXISTS idx_fleet_alert_vehicle_time ON fleet_alerts(vehicle_id,created_at);
