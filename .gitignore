@@ -6,4 +6,3 @@ __pycache__/
 frontend/node_modules/
 c/*.so
 c/*.dylib
-.DS_Store
