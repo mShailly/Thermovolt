@@ -60,6 +60,7 @@ def register_admin(app):
             if not lo<=value<=hi:return jsonify(error=f'{key} must be between {lo} and {hi}.'),400
             numbers[key]=value
         if get_profile(identity):return jsonify(error='This vehicle ID is already registered.'),409
+        if fetch('SELECT id FROM fleet_requests WHERE vehicle_id=?',(identity,)):return jsonify(error='This ID has a registration request. Review it in the approval panel.'),409
         class_name,speed,max_speed,temp,cooling=templates[kind]
         profile=dict(id=identity,**text,**numbers,className=class_name,base_speed=speed,max_speed=max_speed,base_temp=temp,cooling=cooling,accent='#0b88a1',scenario=scenario)
         salt=os.urandom(16);digest=hashlib.pbkdf2_hmac('sha256',pin.encode(),salt,200000);now=datetime.now(timezone.utc).isoformat()
@@ -67,6 +68,8 @@ def register_admin(app):
             with connection() as conn:
                 execute(conn,'INSERT INTO fleet_users VALUES(?,?,?,?)',(identity,salt.hex(),digest.hex(),now))
                 execute(conn,'INSERT INTO fleet_profiles VALUES(?,?,?)',(identity,json.dumps(profile),now))
+                from .registration import audit
+                audit(conn,'direct-registration',identity,scenario)
         except Exception:
             if get_profile(identity):return jsonify(error='This vehicle ID is already registered.'),409
             raise

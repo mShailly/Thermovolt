@@ -79,6 +79,10 @@ from thermovolt.fleet import register_fleet,start_fleet_stream
 register_fleet(app)
 from thermovolt.admin import register_admin
 register_admin(app)
+from thermovolt.registration import register_registration
+register_registration(app)
+from thermovolt.assistant import register_assistant
+register_assistant(app)
 if __name__=='__main__':
     start_fleet_stream(app)
     print('ThermoVolt: open http://127.0.0.1:5050 · '+('PostgreSQL' if POSTGRES else 'SQLite demo database'))

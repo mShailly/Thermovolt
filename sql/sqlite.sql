@@ -18,3 +18,5 @@ CREATE TABLE IF NOT EXISTS fleet_alerts(id TEXT PRIMARY KEY,vehicle_id TEXT NOT 
 CREATE INDEX IF NOT EXISTS idx_fleet_alert_vehicle_time ON fleet_alerts(vehicle_id,created_at);
 CREATE TABLE IF NOT EXISTS fleet_profiles(vehicle_id TEXT PRIMARY KEY REFERENCES fleet_users(vehicle_id),profile TEXT NOT NULL,created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS fleet_admin_sessions(id TEXT PRIMARY KEY,expires_at REAL NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS fleet_requests(id TEXT PRIMARY KEY,vehicle_id TEXT NOT NULL UNIQUE,profile TEXT NOT NULL,pin_salt TEXT NOT NULL,pin_hash TEXT NOT NULL,token_hash TEXT NOT NULL UNIQUE,status TEXT NOT NULL CHECK(status IN ('pending','approved','rejected')),reason TEXT NOT NULL,created_at TEXT NOT NULL,reviewed_at TEXT,reviewed_by TEXT);
+CREATE TABLE IF NOT EXISTS fleet_audit(id TEXT PRIMARY KEY,actor TEXT NOT NULL,action TEXT NOT NULL,vehicle_id TEXT NOT NULL,detail TEXT NOT NULL,created_at TEXT NOT NULL);

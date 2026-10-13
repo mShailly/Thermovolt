@@ -15,4 +15,4 @@ def get_profile(identity):
     rows=fetch('SELECT profile FROM fleet_profiles WHERE vehicle_id=?',(identity,))
     return json.loads(rows[0]['profile']) if rows else None
 def public_profile(p):
-    return dict(id=p['id'],name=p['name'],owner=p.get('owner',''),model=p['model'],className=p.get('className','Electric vehicle'),capacity=p['capacity'],nominalVoltage=p['voltage'],soh=p['soh'],baseSpeed=p['base_speed'],maxSpeed=p['max_speed'],baseTemp=p['base_temp'],cooling=p['cooling'],accent=p.get('accent','#0b88a1'),scenario=p['scenario'])
+    return dict(id=p['id'],name=p['name'],owner=p.get('owner',''),model=p['model'],className=p.get('className','Electric vehicle'),capacity=p['capacity'],nominalVoltage=p['voltage'],soh=p['soh'],baseSpeed=p['base_speed'],maxSpeed=p['max_speed'],baseTemp=p['base_temp'],cooling=p['cooling'],accent=p.get('accent','#0b88a1'),scenario=p['scenario'],active=p.get('active',True))

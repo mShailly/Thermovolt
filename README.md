@@ -1,5 +1,10 @@
 # ThermoVolt - standalone fleet thermal monitoring
 
+Latest update: see COMBINED-UPDATE.md for public registration approval,
+account controls, audit logs, date-range export, AI assistant configuration
+and one-minute audible alert reminders. The earlier five-car-only instructions
+below describe the default profiles; additional approved vehicles are supported.
+
 ## Admin registration update
 
 See ADMIN-UPDATE.md for GitHub/Render upgrade steps. Add ADMIN_USERNAME=admin

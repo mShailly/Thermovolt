@@ -62,6 +62,7 @@ def advance_fleet(optimizer,force=False):
         frames=[]
         from .registry import all_profiles
         for p in all_profiles():
+            if not p.get('active',True):continue
             vehicle_id=p['id']
             rows=fetch('SELECT payload FROM fleet_readings WHERE vehicle_id=? ORDER BY observed_at DESC LIMIT 1',(vehicle_id,))
             previous=json.loads(rows[0]['payload']) if rows else None
@@ -98,6 +99,7 @@ def register_fleet(app):
     def allowed(vehicle_id):
         from .admin import admin_allowed
         if admin_allowed():return True
+        if not get_profile(vehicle_id).get('active',True):return False
         token=request.cookies.get('tv_local_session');rows=fetch('SELECT vehicle_id,expires_at FROM fleet_sessions WHERE id=?',(token or '',))
         return bool(rows and rows[0]['vehicle_id']==vehicle_id and rows[0]['expires_at']>time.time())
     @app.route('/api/local-auth',methods=['POST','DELETE'])
@@ -107,6 +109,7 @@ def register_fleet(app):
             r=jsonify(ok=True);r.delete_cookie('tv_local_session');return r
         p=request.get_json() or {};vehicle_id=str(p.get('vehicleId','')).upper();pin=str(p.get('pin',''));rows=fetch('SELECT pin_salt,pin_hash FROM fleet_users WHERE vehicle_id=?',(vehicle_id,))
         if not rows:return jsonify(error='Vehicle ID or PIN is incorrect.'),401
+        if not get_profile(vehicle_id).get('active',True):return jsonify(error='This vehicle account is suspended. Contact the administrator.'),403
         digest=hashlib.pbkdf2_hmac('sha256',pin.encode(),bytes.fromhex(rows[0]['pin_salt']),200000).hex()
         if not hmac.compare_digest(digest,rows[0]['pin_hash']):return jsonify(error='Vehicle ID or PIN is incorrect.'),401
         token=secrets.token_urlsafe(32);expiry=time.time()+28800
