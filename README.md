@@ -1,5 +1,17 @@
 # ThermoVolt - standalone fleet thermal monitoring
 
+## Admin registration update
+
+See ADMIN-UPDATE.md for GitHub/Render upgrade steps. Add ADMIN_USERNAME=admin
+and your own ADMIN_PASSWORD (at least 10 characters) in Render's Environment.
+Click Administrator access on the login screen. Admins can list all registered
+vehicles, open their monitoring pages, and create more vehicle/user accounts.
+The existing five accounts and database readings are retained.
+Each new profile persists in fleet_profiles and automatically joins the writer.
+Vehicle PINs are hashed. The admin password stays in the server environment.
+Do not run the old hosted-source synchronization helper over frontend/ because
+the standalone frontend now includes additional administration functionality.
+
 All source code is included. The application runs on your own computer at
 http://127.0.0.1:5050 with ordinary Vehicle ID/PIN login. It has no external
 sign-in or cloud account dependency. Use this folder as your VS Code project.

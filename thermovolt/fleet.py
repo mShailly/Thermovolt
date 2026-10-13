@@ -17,7 +17,7 @@ STREAM_LOCK=threading.Lock()
 LABELS={'normal':'Steady driving','hard-acceleration':'Rapid acceleration','high-speed':'Sustained high speed','hot-weather':'Hot ambient conditions','high-load':'High battery load','cell-hotspot':'Cell hotspot','coolant-leak':'Coolant-flow loss'}
 def clamp(v,a,b):return min(b,max(a,v))
 def derive(profile,previous,requested,optimizer):
-    elapsed=(previous.get('elapsed',-20) if previous else -20)+20;mode=AUTOMATIC[profile['id']] if requested=='auto' else requested
+    elapsed=(previous.get('elapsed',-20) if previous else -20)+20;mode=profile.get('scenario',AUTOMATIC.get(profile['id'],'normal')) if requested=='auto' else requested
     phase=elapsed/25;speed=profile['base_speed']+math.sin(phase)*7;acceleration=.4+math.sin(phase*.8)*.45;ambient=29;current=-(58+profile['capacity']*.32);inlet=24
     if mode=='hard-acceleration':acceleration=4.1;speed=clamp((previous.get('speed',profile['base_speed']) if previous else profile['base_speed'])+18,0,profile['max_speed']*.82);current=-(170+profile['capacity']*.7)
     elif mode=='high-speed':speed=profile['max_speed']*.84;acceleration=.8;current=-(155+profile['capacity']*.55)
@@ -60,11 +60,13 @@ def advance_fleet(optimizer,force=False):
     """One writer advances all vehicles; readers never generate extra samples."""
     with STREAM_LOCK:
         frames=[]
-        for vehicle_id,p in PROFILES.items():
+        from .registry import all_profiles
+        for p in all_profiles():
+            vehicle_id=p['id']
             rows=fetch('SELECT payload FROM fleet_readings WHERE vehicle_id=? ORDER BY observed_at DESC LIMIT 1',(vehicle_id,))
             previous=json.loads(rows[0]['payload']) if rows else None
             if previous and not force and time.time()-datetime.fromisoformat(previous['time']).timestamp()<2.8:continue
-            if previous and previous.get('driveMode')!=AUTOMATIC[vehicle_id]:previous=None
+            if previous and previous.get('driveMode')!=p['scenario']:previous=None
             frame=derive({**p,'id':vehicle_id},previous,'auto',optimizer);now=frame['time']
             with connection() as conn:
                 execute(conn,'INSERT INTO fleet_readings VALUES(?,?,?,?,?,?,?)',(str(uuid.uuid4()),vehicle_id,now,frame['temperature'],frame['speed'],frame['driveMode'],json.dumps(frame)))
@@ -91,7 +93,11 @@ def register_fleet(app):
         for vehicle_id,p in PROFILES.items():
             salt=os.urandom(16);digest=hashlib.pbkdf2_hmac('sha256',p['pin'].encode(),salt,200000)
             execute(conn,'INSERT INTO fleet_users(vehicle_id,pin_salt,pin_hash,created_at) VALUES(?,?,?,?) ON CONFLICT(vehicle_id) DO NOTHING',(vehicle_id,salt.hex(),digest.hex(),datetime.now(timezone.utc).isoformat()))
+    from .registry import seed_profiles,get_profile,public_profile
+    seed_profiles(PROFILES,AUTOMATIC)
     def allowed(vehicle_id):
+        from .admin import admin_allowed
+        if admin_allowed():return True
         token=request.cookies.get('tv_local_session');rows=fetch('SELECT vehicle_id,expires_at FROM fleet_sessions WHERE id=?',(token or '',))
         return bool(rows and rows[0]['vehicle_id']==vehicle_id and rows[0]['expires_at']>time.time())
     @app.route('/api/local-auth',methods=['POST','DELETE'])
@@ -105,16 +111,18 @@ def register_fleet(app):
         if not hmac.compare_digest(digest,rows[0]['pin_hash']):return jsonify(error='Vehicle ID or PIN is incorrect.'),401
         token=secrets.token_urlsafe(32);expiry=time.time()+28800
         with connection() as conn:execute(conn,'INSERT INTO fleet_sessions(id,vehicle_id,expires_at,created_at) VALUES(?,?,?,?)',(token,vehicle_id,expiry,datetime.now(timezone.utc).isoformat()))
-        r=jsonify(ok=True);r.set_cookie('tv_local_session',token,max_age=28800,httponly=True,samesite='Lax',secure=request.is_secure);return r
+        profile=get_profile(vehicle_id)
+        r=jsonify(ok=True,vehicle=public_profile(profile));r.set_cookie('tv_local_session',token,max_age=28800,httponly=True,samesite='Lax',secure=request.is_secure or bool(os.environ.get('RENDER')));return r
     @app.route('/api/fleet',methods=['GET','POST','PATCH'])
     def fleet_route():
-        vehicle_id=(request.args.get('vehicle') if request.method=='GET' else (request.get_json() or {}).get('vehicleId','')).upper()
-        if vehicle_id not in PROFILES:return jsonify(error='Vehicle ID not found.'),404
+        vehicle_id=str((request.args.get('vehicle') if request.method=='GET' else (request.get_json() or {}).get('vehicleId','')) or '').upper()
+        profile=get_profile(vehicle_id)
+        if not profile:return jsonify(error='Vehicle ID not found.'),404
         if not allowed(vehicle_id):return jsonify(error='Vehicle session expired. Sign in again.'),401
         if request.method=='GET':
             latest=fetch('SELECT payload FROM fleet_readings WHERE vehicle_id=? ORDER BY observed_at DESC LIMIT 1',(vehicle_id,));history=fetch('SELECT observed_at,temperature,speed,drive_mode,payload FROM fleet_readings WHERE vehicle_id=? ORDER BY observed_at DESC LIMIT 120',(vehicle_id,));alerts=fetch('SELECT * FROM fleet_alerts WHERE vehicle_id=? ORDER BY updated_at DESC LIMIT 100',(vehicle_id,))
             for row in history:row['payload']=json.loads(row['payload'])
-            return jsonify(frame=json.loads(latest[0]['payload']) if latest else None,history=history,alerts=alerts)
+            return jsonify(vehicle=public_profile(profile),frame=json.loads(latest[0]['payload']) if latest else None,history=history,alerts=alerts)
         p=request.get_json() or {}
         if request.method=='PATCH':
             with connection() as conn:execute(conn,"UPDATE fleet_alerts SET status='acknowledged',updated_at=? WHERE id=? AND vehicle_id=? AND status='active'",(datetime.now(timezone.utc).isoformat(),p.get('alertId'),vehicle_id))

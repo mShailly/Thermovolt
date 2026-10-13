@@ -16,3 +16,5 @@ CREATE TABLE IF NOT EXISTS fleet_readings(id TEXT PRIMARY KEY,vehicle_id TEXT NO
 CREATE INDEX IF NOT EXISTS idx_fleet_readings_vehicle_time ON fleet_readings(vehicle_id,observed_at);
 CREATE TABLE IF NOT EXISTS fleet_alerts(id TEXT PRIMARY KEY,vehicle_id TEXT NOT NULL,code TEXT NOT NULL,severity TEXT NOT NULL,title TEXT NOT NULL,message TEXT NOT NULL,action TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','acknowledged','resolved')),created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(vehicle_id,code));
 CREATE INDEX IF NOT EXISTS idx_fleet_alert_vehicle_time ON fleet_alerts(vehicle_id,created_at);
+CREATE TABLE IF NOT EXISTS fleet_profiles(vehicle_id TEXT PRIMARY KEY REFERENCES fleet_users(vehicle_id),profile TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS fleet_admin_sessions(id TEXT PRIMARY KEY,expires_at DOUBLE PRECISION NOT NULL,created_at TEXT NOT NULL);
